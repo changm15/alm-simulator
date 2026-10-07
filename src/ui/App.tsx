@@ -33,6 +33,7 @@ import { Chart } from "./charts";
 import { Ledger } from "./Ledger";
 import { SensitivityPanels } from "./Sensitivity";
 import { ExpenseBreakdown } from "./ExpenseBreakdown";
+import { CapitalGains } from "./CapitalGains";
 import { JURISDICTION_SHORT } from "./labels";
 import { useMediaQuery } from "./useMediaQuery";
 import { currency } from "./format";
@@ -56,43 +57,54 @@ const DEFAULT_ALLOCATION: Allocation = {
   cash: 0.05,
 };
 
+/**
+ * The starting plan anyone sees on a fresh visit.
+ *
+ * Deliberately round, generic figures: this is a public page, and a default
+ * state that reads like one person's actual finances is both misleading and
+ * nobody else's business. Your own edits live in this browser's localStorage
+ * and in share links you choose to send — never in the deployed source.
+ */
 const DEFAULTS: SharedState = {
   v: SHARE_VERSION,
   income: {
-    baseSalary: 200_000,
+    baseSalary: 100_000,
     startYear: THIS_YEAR,
-    currentAge: 32,
-    retirementAge: 60,
+    currentAge: 30,
+    retirementAge: 65,
     trajectory: "promotion_track",
-    promotionCapMultiple: 2.5,
+    promotionCapMultiple: 2,
     filingStatus: "single",
     realWageGrowthPct: 0,
+    retirementBenefit: {
+      system: "us_social_security",
+      claimAge: 67,
+      monthlyAtFullRetirementAge: 2_000,
+      fullRetirementAge: 67,
+    },
   },
   assets: {
-    currentBalance: 400_000,
+    currentBalance: 100_000,
     allocation: DEFAULT_ALLOCATION,
     accountSplit: { taxAdvantaged: 0.4, taxable: 0.6 },
-    contributionRatePct: 25,
-    costBasisFraction: 0.7,
-    taxAdvantagedContributionSharePct: 30,
+    contributionRatePct: 15,
+    costBasisFraction: 0.8,
+    taxAdvantagedContributionSharePct: 50,
     annualTaxAdvantagedLimit: 23_500,
     taxAdvantagedContributionsArePreTax: true,
-    startingCashBuffer: 40_000,
+    startingCashBuffer: 20_000,
   },
   liabilities: {
-    baseAnnualExpenses: 90_000,
+    baseAnnualExpenses: 60_000,
     inflationAssumptionPct: 2.5,
     expenseCategories: DEFAULT_EXPENSE_CATEGORIES,
     postExitDiscretionaryCutPct: 20,
-    oneTimeLiabilities: [
-      { label: "Wedding", year: THIS_YEAR + 3, amount: 60_000 },
-      { label: "Home down payment", year: THIS_YEAR + 6, amount: 250_000 },
-    ],
-    retirementIncomeTargetAnnual: 90_000,
+    oneTimeLiabilities: [],
+    retirementIncomeTargetAnnual: 60_000,
   },
   scenario: { marketPath: "base", relocationEvents: [] },
   startJurisdiction: "nyc",
-  planToAge: 95,
+  planToAge: 90,
   paths: 500,
 };
 
@@ -103,6 +115,7 @@ type View =
   | "scenario"
   | "networth"
   | "spending"
+  | "gains"
   | "sensitivity"
   | "ledger";
 
@@ -114,6 +127,7 @@ const ICONS: Record<View, string> = {
     "M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2",
   networth: "M4 19V5M4 19h16M8 15l4-6 4 3 3-6",
   spending: "M12 3v18M4 8h16M4 16h16",
+  gains: "M4 20V4M4 20h16M8 16l3-5 3 3 4-7",
   sensitivity: "M4 20V9M10 20V4M16 20v-7M22 20h-20",
   ledger: "M5 4h14v16H5zM9 8h6M9 12h6M9 16h3",
 };
@@ -242,10 +256,21 @@ export function App() {
     { id: "liabilities", name: "Liabilities", sum: `${currency(spend)}/yr · ${(liabilities.expenseCategories ?? []).length} lines` },
     { id: "scenario", name: "Scenario", sum: `${scenario.marketPath} · ${JURISDICTION_SHORT[startJurisdiction]}` },
   ];
-  const RESULT_VIEWS: View[] = ["networth", "spending", "sensitivity", "ledger"];
+  const RESULT_VIEWS: View[] = [
+    "networth",
+    "spending",
+    "gains",
+    "sensitivity",
+    "ledger",
+  ];
   const RESULTS: { id: View; name: string; sum: string }[] = [
     { id: "networth", name: "Net worth", sum: currency(mc.terminalNetWorth.median) },
     { id: "spending", name: "Spending", sum: `${currency(spend)} a year` },
+    {
+      id: "gains",
+      name: "Capital gains",
+      sum: `${currency(mc.representativePath.years[0]?.unrealizedGain ?? 0)} unrealized`,
+    },
     { id: "sensitivity", name: "Sensitivity", sum: sweeps ? "run" : "not run" },
     { id: "ledger", name: "Ledger", sum: `${horizonYears} years` },
   ];
@@ -439,6 +464,17 @@ export function App() {
                   oneTimeLabels={(liabilities.oneTimeLiabilities ?? []).map((o) => o.label)}
                 />
               </Card>
+            </div>
+          )}
+
+          {view === "gains" && (
+            <div className="enter">
+              <SectionHead
+                title="Capital gains"
+                sub="Growth in a taxable account is untaxed until something forces a sale, and then only the gain portion is taxed. This is the embedded liability you are carrying, and the years where a sale actually crystallised some of it."
+                pill={`${currency(mc.representativePath.totalRealizedGains)} realized over the plan`}
+              />
+              <CapitalGains path={mc.representativePath} config={config} />
             </div>
           )}
 

@@ -51,6 +51,11 @@ export interface MonteCarloResult {
   totalInvestmentGain: DistributionSummary;
   /** Lifetime tax paid — income + payroll + capital gains. */
   totalTaxPaid: DistributionSummary;
+  /** Lifetime realized capital gains, and the tax on them. */
+  totalRealizedGains: DistributionSummary;
+  totalCapitalGainsTax: DistributionSummary;
+  /** Lifetime government benefit received, net of any clawback. */
+  totalBenefitsReceived: DistributionSummary;
   /** Share of paths where spending could not be funded in some year. */
   shortfallProbability: number;
   /** Median year index of the first funding failure, across failing paths. */
@@ -146,6 +151,9 @@ export function runMonteCarlo(
     totalContributions: summarize(paths.map((p) => p.totalContributions)),
     totalInvestmentGain: summarize(paths.map((p) => p.totalInvestmentGain)),
     totalTaxPaid: summarize(paths.map((p) => p.totalTaxPaid)),
+    totalRealizedGains: summarize(paths.map((p) => p.totalRealizedGains)),
+    totalCapitalGainsTax: summarize(paths.map((p) => p.totalCapitalGainsTax)),
+    totalBenefitsReceived: summarize(paths.map((p) => p.totalBenefitsReceived)),
     shortfallProbability: paths.length ? failing.length / paths.length : 0,
     medianFirstShortfallYearIndex: failIdx.length
       ? percentile(failIdx, 0.5)

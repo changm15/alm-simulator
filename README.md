@@ -37,7 +37,7 @@ never caching the HTML that points at them.
 ./scripts/install-local-service.sh --remove   # stop and uninstall
 ```
 
-That installs `~/Library/LaunchAgents/com.michaelchang.alm-simulator.plist`,
+That installs `~/Library/LaunchAgents/local.alm-simulator.plist`,
 which starts the server at login and restarts it if it dies. It serves
 `http://localhost:5178` and the machine's LAN address; logs go to
 `~/Library/Logs/alm-simulator.log`. Re-run the script after code changes — the
@@ -99,6 +99,26 @@ own inflation rate (healthcare and childcare run well above headline CPI), its
 own cost-of-living sensitivity (a move cuts rent a lot and streaming
 subscriptions not at all), and an essential flag that decides whether it
 survives a post-retirement cut.
+
+**Government benefits are modelled, not hand-waved.** US Social Security or
+Canadian CPP + OAS, with the actuarial claiming schedules (−30% at 62 / +24% at
+70 against a 67 FRA; CPP −0.6%/month before 65 and +0.7%/month after; OAS
+deferral to 70). Three details that change the answer:
+
+- **The US taxable-portion formula.** Up to 85% of a benefit is federally
+  taxable depending on provisional income — and those thresholds have been
+  fixed in nominal dollars since 1984. The model does not index them, because
+  Congress hasn't: for an unchanged standard of living the taxable share of the
+  benefit climbs from 18% today to 55% in 25 years.
+- **Social Security is exempt from state tax** in all four jurisdictions here,
+  so it is carried as a separate state-exempt component rather than taxed twice.
+- **The OAS recovery tax** claws back 15% of income above an indexed threshold.
+  It bites a retiree drawing from a tax-advantaged account and leaves alone one
+  drawing from a high-basis taxable account — both cases are pinned by tests.
+
+The benefit is solved inside the same fixed point as the deferral, the tax bill
+and the withdrawal, because how much of it is taxable depends on the very
+withdrawal it is helping to avoid.
 
 **Separate account tracks with real basis accounting.** Taxable and
 tax-advantaged balances never blend. A taxable withdrawal realizes only the
@@ -246,6 +266,16 @@ Nominal, annual, long-run, base path. Planning inputs, not forecasts — edit
 Other modelling choices: annual rebalancing to target, returns applied to
 opening balances with flows landing at year end, one-time liabilities entered
 in today's dollars and inflated to the year they land.
+
+## Capital gains
+
+A dedicated view separates what you have accrued from what you have paid tax
+on: the embedded unrealized gain, what liquidating it today would cost, the
+years a forced sale crystallised some, and the effective rate paid on those
+gains. The cost-basis tracking is what makes it possible — contributions add
+basis one for one and growth does not, so an untouched account becomes steadily
+more expensive to unwind. On the default plan the gain share drifts from 14% to
+89% across the horizon.
 
 ## Percentile bands
 

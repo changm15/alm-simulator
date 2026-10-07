@@ -24,12 +24,16 @@ export interface ExpenseYear {
   items: { label: string; amount: number }[];
 }
 
-/** Sensible starting plan for the UI. Amounts are today's dollars. */
+/**
+ * An illustrative starting plan, in deliberately round numbers — this is the
+ * first thing a stranger sees on the public build, so it should read as an
+ * example rather than as somebody's actual budget. Sums to $60,000.
+ */
 export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategory[] = [
-  { label: "Housing", annualAmount: 42_000, colSensitivity: 1.0, essential: true },
+  { label: "Housing", annualAmount: 24_000, colSensitivity: 1.0, essential: true },
   {
     label: "Food & groceries",
-    annualAmount: 12_000,
+    annualAmount: 9_000,
     colSensitivity: 0.6,
     essential: true,
   },
@@ -48,19 +52,19 @@ export const DEFAULT_EXPENSE_CATEGORIES: ExpenseCategory[] = [
   },
   {
     label: "Insurance & other fixed",
-    annualAmount: 5_000,
+    annualAmount: 4_000,
     colSensitivity: 0.2,
     essential: true,
   },
   {
     label: "Travel & discretionary",
-    annualAmount: 15_000,
+    annualAmount: 8_000,
     colSensitivity: 0.3,
     essential: false,
   },
   {
     label: "Everything else",
-    annualAmount: 4_000,
+    annualAmount: 3_000,
     colSensitivity: 0.3,
     essential: false,
   },

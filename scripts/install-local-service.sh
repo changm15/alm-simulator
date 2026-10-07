@@ -6,7 +6,7 @@
 #   ./scripts/install-local-service.sh --remove  stop and uninstall
 set -euo pipefail
 
-LABEL="com.michaelchang.alm-simulator"
+LABEL="local.alm-simulator"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT="${PORT:-5178}"

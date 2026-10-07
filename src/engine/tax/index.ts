@@ -45,6 +45,13 @@ export interface TaxInput {
   ordinaryIncome: number;
   /** Realized long-term gains from taxable-account sales only. */
   realizedGains: number;
+  /**
+   * Part of ordinaryIncome that is federally taxable but exempt from STATE
+   * tax. US Social Security is exempt in all four modelled jurisdictions;
+   * taxing it at the state level would overstate the bill every year of
+   * retirement.
+   */
+  stateExemptOrdinaryIncome?: number;
   ctx: TaxContext;
 }
 
@@ -53,7 +60,11 @@ export function computeTax(input: TaxInput): TaxBill {
   const ctx = { ...input.ctx, ordinaryIncome: input.ordinaryIncome };
 
   const fedIncome = federalIncomeTax(input.ordinaryIncome, ctx);
-  const stateIncome = j.incomeTax(input.ordinaryIncome, ctx);
+  const stateBase = Math.max(
+    0,
+    input.ordinaryIncome - (input.stateExemptOrdinaryIncome ?? 0),
+  );
+  const stateIncome = j.incomeTax(stateBase, ctx);
 
   // Federal LTCG stacks on federal TAXABLE income (after the standard
   // deduction), not on gross.

@@ -6,6 +6,8 @@
  * mutates only AssetConfig.allocation.
  */
 
+import type { RetirementBenefitConfig } from "./benefits";
+
 export type FilingStatus = "single" | "married";
 
 export type Jurisdiction = "seattle" | "nyc" | "jerseycity" | "la";
@@ -81,6 +83,12 @@ export interface IncomeConfig {
   /** Years the replacement income lasts (e.g. severance). Omit = forever. */
   exitReplacementYears?: number;
   otherIncomeStreams?: OtherIncomeStream[];
+  /**
+   * Government retirement benefit — US Social Security, or Canadian CPP + OAS.
+   * An inflation-indexed life annuity that funds part of the liability stream
+   * directly, so the portfolio does not have to.
+   */
+  retirementBenefit?: RetirementBenefitConfig;
   filingStatus: FilingStatus;
   /** Real wage growth on top of inflation, applied every year. */
   realWageGrowthPct?: number;
@@ -241,6 +249,15 @@ export interface YearResult {
   jurisdiction: Jurisdiction;
   grossWageIncome: number;
   otherIncome: number;
+  /** Government benefit before any clawback. */
+  benefitGross: number;
+  /** OAS recovery tax withheld; always 0 for US Social Security. */
+  benefitClawback: number;
+  /** Benefit cash actually received. */
+  benefitNet: number;
+  /** Portion of the benefit included in ordinary taxable income. */
+  benefitTaxable: number;
+  /** Cash income: wages + other + benefit received. */
   totalIncome: number;
   expenses: number;
   /** Per-category expense detail for the year, in nominal dollars. */
@@ -267,6 +284,8 @@ export interface YearResult {
   cashBuffer: number;
   taxableBalance: number;
   taxableBasis: number;
+  /** Embedded gain in the taxable account: balance − basis. */
+  unrealizedGain: number;
   taxAdvantagedBalance: number;
   /** taxable + taxAdvantaged (excludes the side cash buffer). */
   portfolioBalance: number;
@@ -285,6 +304,9 @@ export interface PathResult {
   totalWithdrawals: number;
   totalInvestmentGain: number;
   totalTaxPaid: number;
+  totalRealizedGains: number;
+  totalCapitalGainsTax: number;
+  totalBenefitsReceived: number;
   /** Money-weighted annualized return on the portfolio over the horizon. */
   annualizedReturnPct: number;
   maxDrawdownPct: number;

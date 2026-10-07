@@ -30,6 +30,10 @@
  * 4. When a year cannot be funded, the deferral is cut back BEFORE anything is
  *    sold — which is what people actually do.
  *
+ * 5. A government benefit (Social Security, or CPP + OAS) is solved inside the
+ *    same fixed point, because how much of it is taxable depends on the rest of
+ *    the year's income — including the very withdrawal it is helping to avoid.
+ *
  * Modelling assumptions worth knowing:
  *  - The portfolio is rebalanced to the target allocation annually, which is
  *    what applying a single blended return to the whole balance implies.
@@ -44,6 +48,7 @@ import { ageInYear, incomeForYear } from "./income";
 import { buildRegimeTimeline } from "./relocation";
 import { resolveScenario } from "./scenario";
 import { computeTax } from "./tax";
+import { benefitForYear, BenefitYear } from "./benefits";
 import { PathResult, SimulationConfig, YearResult } from "./types";
 
 const SOLVE_TOLERANCE = 1;
@@ -113,6 +118,9 @@ export function runPath(config: SimulationConfig): PathResult {
   let totalWithdrawals = 0;
   let totalInvestmentGain = 0;
   let totalTaxPaid = 0;
+  let totalRealizedGains = 0;
+  let totalCapitalGainsTax = 0;
+  let totalBenefitsReceived = 0;
   let cumulativeGrowth = 1;
 
   const filingStatus = income.filingStatus;
@@ -144,7 +152,8 @@ export function runPath(config: SimulationConfig): PathResult {
       regime.incomeMultiplier * resolved.incomeMultiplierByYearIndex[y];
     const wage = inc.wage * incomeMult;
     const other = inc.other;
-    const totalIncome = wage + other;
+    const totalWageAndOther = wage + other;
+    const age = ageInYear(income, y);
 
     if (inc.wageIncomeEnded) wageEndedSticky = true;
 
@@ -155,12 +164,56 @@ export function runPath(config: SimulationConfig): PathResult {
       scenarioOneTime: resolved.extraExpenseByYearIndex[y],
     });
 
-    // --- Pre-tax deferral solve --------------------------------------------
-    // The deferral lowers taxable income, which lowers tax, which raises the
-    // cash left over. If the year still cannot be funded, the deferral is cut
-    // back before anything is sold.
-    const targetSavings = Math.max(0, totalIncome * contributionRate);
-    const deferralLimit = (assets.annualTaxAdvantagedLimit ?? DEFAULT_DEFERRAL_LIMIT) * infl;
+    // --- Joint solve: deferral, benefit, tax and withdrawal ----------------
+    // Every one of these depends on the others. The benefit's taxable portion
+    // depends on other income; other income depends on the withdrawal; the
+    // withdrawal depends on the tax bill; the tax bill depends on the benefit.
+    // One helper evaluates a candidate state so both loops below agree.
+    const targetSavings = Math.max(0, totalWageAndOther * contributionRate);
+    const deferralLimit =
+      (assets.annualTaxAdvantagedLimit ?? DEFAULT_DEFERRAL_LIMIT) * infl;
+
+    const evaluate = (
+      deferral: number,
+      taxAdvW: number,
+      realized: number,
+    ): {
+      benefit: BenefitYear;
+      cashIncome: number;
+      ordinary: number;
+      bill: ReturnType<typeof computeTax>;
+      leftover: number;
+    } => {
+      const deduction = preTax ? deferral : 0;
+      // The benefit's own taxability test sees everything else recognized.
+      const otherRecognized =
+        totalWageAndOther - deduction + taxAdvW + realized;
+      const benefit = benefitForYear(
+        income.retirementBenefit,
+        age,
+        infl,
+        otherRecognized,
+        filingStatus,
+      );
+      const cashIncome = totalWageAndOther + benefit.net;
+      const ordinary =
+        totalWageAndOther - deduction + benefit.taxable + taxAdvW;
+      const bill = computeTax({
+        jurisdiction: regime.jurisdiction,
+        wages: wage,
+        ordinaryIncome: ordinary,
+        stateExemptOrdinaryIncome: benefit.stateExempt,
+        realizedGains: realized,
+        ctx,
+      });
+      return {
+        benefit,
+        cashIncome,
+        ordinary,
+        bill,
+        leftover: cashIncome - deferral - bill.total - exp.total,
+      };
+    };
 
     let taxAdvContribution = Math.min(
       targetSavings * taxAdvContribShare,
@@ -168,44 +221,23 @@ export function runPath(config: SimulationConfig): PathResult {
       Math.max(0, wage),
     );
 
-    let bill = computeTax({
-      jurisdiction: regime.jurisdiction,
-      wages: wage,
-      ordinaryIncome: totalIncome - (preTax ? taxAdvContribution : 0),
-      realizedGains: 0,
-      ctx,
-    });
-    let leftover = totalIncome - taxAdvContribution - bill.total - exp.total;
+    let state = evaluate(taxAdvContribution, 0, 0);
 
-    for (let iter = 0; iter < SOLVE_MAX_ITERATIONS && leftover < 0; iter++) {
+    // A pre-tax deferral lowers taxable income, which lowers tax, which raises
+    // the cash left over. If the year still cannot be funded, the deferral is
+    // cut back before anything is sold.
+    for (let iter = 0; iter < SOLVE_MAX_ITERATIONS && state.leftover < 0; iter++) {
       if (taxAdvContribution <= 0) break;
-      taxAdvContribution = Math.max(0, taxAdvContribution + leftover);
-      bill = computeTax({
-        jurisdiction: regime.jurisdiction,
-        wages: wage,
-        ordinaryIncome: totalIncome - (preTax ? taxAdvContribution : 0),
-        realizedGains: 0,
-        ctx,
-      });
-      leftover = totalIncome - taxAdvContribution - bill.total - exp.total;
+      taxAdvContribution = Math.max(0, taxAdvContribution + state.leftover);
+      state = evaluate(taxAdvContribution, 0, 0);
     }
-
-    if (leftover < 0 && taxAdvContribution > 0) {
+    if (state.leftover < 0 && taxAdvContribution > 0) {
       // Ran out of iterations: no deferral at all rather than an inconsistent one.
       taxAdvContribution = 0;
-      bill = computeTax({
-        jurisdiction: regime.jurisdiction,
-        wages: wage,
-        ordinaryIncome: totalIncome,
-        realizedGains: 0,
-        ctx,
-      });
-      leftover = totalIncome - bill.total - exp.total;
+      state = evaluate(0, 0, 0);
     }
 
-    const deduction = preTax ? taxAdvContribution : 0;
-
-    // --- Joint tax / withdrawal solve --------------------------------------
+    // --- Withdrawal solve --------------------------------------------------
     const gainFraction =
       taxableBalance > 0 ? Math.max(0, 1 - taxableBasis / taxableBalance) : 0;
 
@@ -215,18 +247,11 @@ export function runPath(config: SimulationConfig): PathResult {
     let realizedGains = 0;
     let shortfallAmount = 0;
 
-    if (leftover < 0) {
+    if (state.leftover < 0) {
       let previousGross = 0;
       for (let iter = 0; iter < SOLVE_MAX_ITERATIONS; iter++) {
-        bill = computeTax({
-          jurisdiction: regime.jurisdiction,
-          wages: wage,
-          ordinaryIncome: totalIncome - deduction + taxAdvWithdrawal,
-          realizedGains,
-          ctx,
-        });
-        leftover = totalIncome - taxAdvContribution - bill.total - exp.total;
-        if (leftover >= 0) {
+        state = evaluate(taxAdvContribution, taxAdvWithdrawal, realizedGains);
+        if (state.leftover >= 0) {
           fromCash = 0;
           fromTaxable = 0;
           taxAdvWithdrawal = 0;
@@ -235,7 +260,7 @@ export function runPath(config: SimulationConfig): PathResult {
           break;
         }
 
-        let need = -leftover;
+        let need = -state.leftover;
         fromCash = Math.min(cashBuffer, need);
         need -= fromCash;
         fromTaxable = Math.min(taxableBalance, need);
@@ -251,9 +276,13 @@ export function runPath(config: SimulationConfig): PathResult {
       }
     }
 
+    const benefit = state.benefit;
+    const bill = state.bill;
+    const totalIncome = state.cashIncome;
+    const ordinaryTaxableIncome = state.ordinary;
+    const leftover = state.leftover;
+
     const freeCashFlow = totalIncome - exp.total - bill.total;
-    const ordinaryTaxableIncome =
-      totalIncome - deduction + taxAdvWithdrawal;
 
     // --- Apply flows -------------------------------------------------------
     const withdrawal = fromCash + fromTaxable + taxAdvWithdrawal;
@@ -307,15 +336,22 @@ export function runPath(config: SimulationConfig): PathResult {
     totalWithdrawals += withdrawal;
     totalInvestmentGain += investmentGain;
     totalTaxPaid += bill.total;
+    totalRealizedGains += realizedGains;
+    totalCapitalGainsTax += bill.capitalGainsTax;
+    totalBenefitsReceived += benefit.net;
     cumulativeGrowth *= 1 + r;
 
     years.push({
       year,
       yearIndex: y,
-      age: ageInYear(income, y),
+      age,
       jurisdiction: regime.jurisdiction,
       grossWageIncome: wage,
       otherIncome: other,
+      benefitGross: benefit.gross,
+      benefitClawback: benefit.clawback,
+      benefitNet: benefit.net,
+      benefitTaxable: benefit.taxable,
       totalIncome,
       expenses: exp.total,
       expenseBreakdown: exp.items,
@@ -336,6 +372,7 @@ export function runPath(config: SimulationConfig): PathResult {
       cashBuffer,
       taxableBalance,
       taxableBasis,
+      unrealizedGain: Math.max(0, taxableBalance - taxableBasis),
       taxAdvantagedBalance,
       portfolioBalance,
       netWorth,
@@ -356,6 +393,9 @@ export function runPath(config: SimulationConfig): PathResult {
     totalWithdrawals,
     totalInvestmentGain,
     totalTaxPaid,
+    totalRealizedGains,
+    totalCapitalGainsTax,
+    totalBenefitsReceived,
     // Time-weighted: the portfolio's own return, independent of when money
     // went in. That is what "what did my portfolio return" means.
     annualizedReturnPct: (Math.pow(cumulativeGrowth, 1 / n) - 1) * 100,

@@ -11,6 +11,14 @@ import {
 import { CAPITAL_MARKET_ASSUMPTIONS, normalizeAllocation } from "../engine/market";
 import { DEFAULT_EXPENSE_CATEGORIES, baseSpend } from "../engine/liabilities";
 import { resolveExitYear, scheduledSalary } from "../engine/income";
+import {
+  BENEFIT_REFERENCE,
+  BenefitSystem,
+  cppFactor,
+  oasFactor,
+  RetirementBenefitConfig,
+  socialSecurityFactor,
+} from "../engine/benefits";
 import { suggestedExpenseMultiplier } from "../engine/relocation";
 import { JURISDICTIONS } from "../engine/tax";
 import { BAND_OPTIONS, BandKey } from "../engine/simulate";
@@ -247,7 +255,162 @@ export function IncomeSection({
             <SalarySchedule income={income} onIncome={onIncome} />
           </Card>
         )}
+
+        <Card title="Government benefit">
+          <RetirementBenefitEditor
+            benefit={income.retirementBenefit}
+            retirementAge={ageRetire}
+            onChange={(b) => onIncome({ retirementBenefit: b })}
+          />
+        </Card>
       </div>
+    </div>
+  );
+}
+
+const BENEFIT_DEFAULTS: Record<BenefitSystem, RetirementBenefitConfig> = {
+  none: { system: "none", claimAge: 67 },
+  us_social_security: {
+    system: "us_social_security",
+    claimAge: 67,
+    monthlyAtFullRetirementAge: 2_000,
+    fullRetirementAge: 67,
+  },
+  canada_cpp_oas: {
+    system: "canada_cpp_oas",
+    claimAge: 65,
+    cppMonthlyAt65: 900,
+    oasMonthlyAt65: 728,
+  },
+};
+
+/**
+ * Claiming is one of the few large levers left at retirement, so the editor
+ * shows what the adjustment actually does to the cheque rather than making the
+ * user look up a schedule.
+ */
+function RetirementBenefitEditor({
+  benefit,
+  retirementAge,
+  onChange,
+}: {
+  benefit: RetirementBenefitConfig | undefined;
+  retirementAge: number;
+  onChange: (b: RetirementBenefitConfig) => void;
+}) {
+  const cfg = benefit ?? BENEFIT_DEFAULTS.none;
+  const system = cfg.system;
+  const patch = (p: Partial<RetirementBenefitConfig>) =>
+    onChange({ ...cfg, ...p });
+
+  if (system === "none") {
+    return (
+      <div className="stack">
+        <Segmented
+          label="System"
+          value={system}
+          options={[
+            { value: "none", label: "None" },
+            { value: "us_social_security", label: "US Social Security" },
+            { value: "canada_cpp_oas", label: "Canada CPP + OAS" },
+          ]}
+          onChange={(v) => onChange(BENEFIT_DEFAULTS[v])}
+        />
+        <div className="empty">
+          No government benefit modelled. Leaving one out overstates how much
+          the portfolio has to fund — it is an inflation-indexed annuity for
+          life, and it never runs out.
+        </div>
+      </div>
+    );
+  }
+
+  const isUS = system === "us_social_security";
+  const fra = cfg.fullRetirementAge ?? 67;
+  const minAge = isUS ? 62 : 60;
+
+  const factor = isUS ? socialSecurityFactor(cfg.claimAge, fra) : cppFactor(cfg.claimAge);
+  const annual = isUS
+    ? (cfg.monthlyAtFullRetirementAge ?? 0) * 12 * factor
+    : (cfg.cppMonthlyAt65 ?? 0) * 12 * cppFactor(cfg.claimAge) +
+      (cfg.oasMonthlyAt65 ?? 0) * 12 * oasFactor(Math.max(65, cfg.claimAge));
+
+  const delta = Math.round((factor - 1) * 100);
+  const neutral = isUS ? fra : 65;
+
+  return (
+    <div className="stack">
+      <Segmented
+        label="System"
+        value={system}
+        options={[
+          { value: "none", label: "None" },
+          { value: "us_social_security", label: "US Social Security" },
+          { value: "canada_cpp_oas", label: "Canada CPP + OAS" },
+        ]}
+        onChange={(v) => onChange(BENEFIT_DEFAULTS[v])}
+      />
+
+      {isUS ? (
+        <NumberInput
+          label="Monthly benefit at full retirement age"
+          prefix="$"
+          step={50}
+          value={cfg.monthlyAtFullRetirementAge ?? 0}
+          onChange={(v) => patch({ monthlyAtFullRetirementAge: v })}
+          hint={`Your PIA, from a Social Security statement. For reference the 2025 average is about $${BENEFIT_REFERENCE.usAverageMonthly.toLocaleString()} and the maximum about $${BENEFIT_REFERENCE.usMaxMonthlyAtFra.toLocaleString()}.`}
+        />
+      ) : (
+        <div className="row-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <NumberInput
+            label="CPP at 65"
+            prefix="$"
+            suffix="/mo"
+            step={25}
+            value={cfg.cppMonthlyAt65 ?? 0}
+            onChange={(v) => patch({ cppMonthlyAt65: v })}
+            hint={`2025 max about $${BENEFIT_REFERENCE.cppMaxMonthlyAt65.toLocaleString()}.`}
+          />
+          <NumberInput
+            label="OAS at 65"
+            prefix="$"
+            suffix="/mo"
+            step={10}
+            value={cfg.oasMonthlyAt65 ?? 0}
+            onChange={(v) => patch({ oasMonthlyAt65: v })}
+            hint="2025 figure about $728."
+          />
+        </div>
+      )}
+
+      <Slider
+        label="Claim at age"
+        min={minAge}
+        max={70}
+        value={cfg.claimAge}
+        display={`${cfg.claimAge}`}
+        onChange={(v) => patch({ claimAge: v })}
+        hint={
+          cfg.claimAge === neutral
+            ? `The unadjusted age. Claiming earlier cuts the cheque permanently; later raises it.`
+            : `${delta > 0 ? "+" : ""}${delta}% against claiming at ${neutral}, for life.`
+        }
+      />
+
+      <Card flat>
+        <div className="readout" style={{ lineHeight: 1.9 }}>
+          Pays <b>{currencyExact(annual)}</b> a year from age{" "}
+          <b>{cfg.claimAge}</b>, in today&rsquo;s dollars and indexed for life.
+        </div>
+        <p className="fh">
+          {cfg.claimAge > retirementAge
+            ? `You stop working at ${retirementAge}, so the portfolio funds ${cfg.claimAge - retirementAge} year${cfg.claimAge - retirementAge === 1 ? "" : "s"} alone before this starts.`
+            : "It begins at or before you stop working."}
+          {isUS
+            ? " Up to 85% is federally taxable depending on your other income, and it is exempt from state tax in every jurisdiction here."
+            : " CPP and OAS are ordinary income, and OAS is clawed back at 15% of income above roughly $93k."}
+        </p>
+      </Card>
     </div>
   );
 }
