@@ -13,8 +13,35 @@ tax, or legal advice.
 npm install
 npm test                        # 24 engine tests, no UI required
 npm run dev -- --host           # http://localhost:5178 + a LAN URL for your phone
-npm run build && npm run preview -- --host   # production build instead
+npm run build && npm run serve  # production build, served locally
 ```
+
+## Deployment
+
+Two targets, one source. `BASE_PATH` is the only thing that differs: the build
+defaults to a domain root and GitHub Pages passes `/alm-simulator/`, so the
+same `vite.config.ts` serves both without a second config.
+
+**GitHub Pages** — `.github/workflows/pages.yml` builds and publishes on every
+push to `main`. The engine tests gate it: a broken projection never ships.
+
+**Locally, persistently** — `serve.mjs` is a zero-dependency static server for
+`dist/`. Deliberately not `vite preview`: it runs under launchd long after the
+dev tooling is irrelevant, so it depends on nothing but Node. It binds all
+interfaces, so a phone on the same Wi-Fi can reach it; it falls back to the
+shell on unknown paths; and it caches Vite's fingerprinted assets hard while
+never caching the HTML that points at them.
+
+```bash
+./scripts/install-local-service.sh            # build + install the launchd agent
+./scripts/install-local-service.sh --remove   # stop and uninstall
+```
+
+That installs `~/Library/LaunchAgents/com.michaelchang.alm-simulator.plist`,
+which starts the server at login and restarts it if it dies. It serves
+`http://localhost:5178` and the machine's LAN address; logs go to
+`~/Library/Logs/alm-simulator.log`. Re-run the script after code changes — the
+agent serves the built `dist/`, not the source.
 
 The UI is responsive down to phone widths: the four config blocks stack, inputs
 are 16px so iOS does not zoom on focus, charts size their viewBox to the real
