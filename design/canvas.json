@@ -1,0 +1,11 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "App shell — desktop", "is_interactive": true },
+    { "file": "Mobile.dc.html", "x": 1560, "y": 0, "w": 390, "h": 844, "title": "App shell — phone", "is_interactive": true }
+  ],
+  "annotations": [
+    { "id": "brief", "x": 0, "y": -170, "w": 620, "text": "Config as an app, not a form.\nEverything is live — switch sections, drag the sliders, watch the right rail respond.\n\nThree structural moves: a persistent left nav instead of browser-style tabs, a right rail that shows the consequence of every edit without scrolling, and advanced knobs folded behind disclosures so the common path stays short." },
+    { "id": "mobile-note", "x": 1560, "y": -170, "w": 390, "text": "Phone. The outcome pins to the top since it cannot sit beside the form, and navigation moves to a thumb-reachable bottom bar." }
+  ],
+  "launch": { "view": "canvas" }
+}

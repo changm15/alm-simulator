@@ -1,0 +1,11 @@
+{
+  "name": "Personal ALM Simulator",
+  "short_name": "ALM Sim",
+  "description": "Cash-flow simulation and allocation sensitivity under stated assumptions.",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#121211",
+  "theme_color": "#121211",
+  "scope": "./"
+}

@@ -1,0 +1,663 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+    body { margin: 0; }
+    a { color: #3987e5; } a:hover { color: #2a78d6; }
+
+    .root {
+      --s0: #101010; --s1: #191919; --s2: #212121; --s3: #2a2a29;
+      --bd: #303030; --bd2: #3d3d3c;
+      --tp: #f7f7f5; --ts: #b9b8b1; --tm: #7e7d76;
+      --acc: #3987e5; --acc-soft: rgba(57,135,229,0.14);
+      --good: #199e70; --crit: #e66767; --warn: #d95926;
+      --c1: #3987e5; --c2: #d95926; --c3: #199e70; --c4: #c98500;
+      --c5: #d55181; --c6: #008300; --c7: #9085e9;
+      --sh: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -14px rgba(0,0,0,.6);
+      --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px; line-height: 1.5; letter-spacing: -0.005em;
+      background: var(--s0); color: var(--tp);
+      height: 100%; display: flex; flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+    .root.light {
+      --s0: #f0efec; --s1: #ffffff; --s2: #f7f6f3; --s3: #eceae5;
+      --bd: #e2e0da; --bd2: #d3d0c9;
+      --tp: #17171a; --ts: #56554f; --tm: #85837c;
+      --acc: #2a78d6; --acc-soft: rgba(42,120,214,0.11);
+      --good: #1baf7a; --crit: #e34948; --warn: #eb6834;
+      --c1: #2a78d6; --c2: #eb6834; --c3: #1baf7a; --c4: #eda100;
+      --c5: #e87ba4; --c6: #008300; --c7: #4a3aa7;
+      --sh: 0 1px 2px rgba(30,28,24,.06), 0 10px 28px -16px rgba(30,28,24,.22);
+    }
+
+    .m { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .eyebrow { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--tm); font-weight: 600; }
+    .fl { font-size: 13.5px; color: var(--ts); font-weight: 500; }
+    .fh { font-size: 11.5px; color: var(--tm); margin-top: 4px; line-height: 1.5; }
+
+    /* The outcome stays pinned at the top — on a phone you cannot put it
+       beside the form, so it rides above it and never scrolls away. */
+    .hero-bar {
+      flex: 0 0 auto; padding: 14px 16px 12px; background: var(--s1);
+      border-bottom: 1px solid var(--bd);
+    }
+    .hero { font-family: var(--mono); font-size: 26px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.1; }
+
+    .body { flex: 1 1 auto; overflow: auto; padding: 16px 16px 22px; }
+    .enter { animation: rise .26s cubic-bezier(.2,.7,.3,1) both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+
+    /* Bottom tab bar — thumb-reachable, the standard place for app-level nav. */
+    .tabbar {
+      flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--bd); background: var(--s1); padding: 6px 6px 10px;
+    }
+    .tabbtn {
+      cursor: pointer; background: transparent; border: none; border-radius: 10px;
+      color: var(--tm); font: inherit; padding: 7px 2px 6px; min-height: 50px;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      transition: color .16s ease, background .16s ease;
+    }
+    .tabbtn.on { color: var(--acc); background: var(--acc-soft); }
+    .tabbtn span { font-size: 10.5px; font-weight: 600; letter-spacing: -0.01em; }
+
+    .card { background: var(--s1); border: 1px solid var(--bd); border-radius: 13px; padding: 15px; box-shadow: var(--sh); }
+    .card.flat { box-shadow: none; background: var(--s2); }
+
+    .ctl {
+      display: flex; align-items: center; background: var(--s2);
+      border: 1px solid var(--bd); border-radius: 11px; height: 46px;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .ctl:focus-within { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+    .adorn { padding: 0 2px 0 13px; color: var(--tm); font-family: var(--mono); font-size: 16px; }
+    .adorn.suf { padding: 0 13px 0 2px; font-size: 13px; }
+    .ctl input {
+      flex: 1 1 auto; min-width: 0; width: 100%; border: none; outline: none; background: transparent;
+      color: var(--tp); font-family: var(--mono); font-size: 16px; padding: 0 13px;
+      text-align: right; font-variant-numeric: tabular-nums;
+    }
+    .ctl.pre input { padding-left: 0; }
+    .ctl.suf input { padding-right: 0; }
+
+    .seg { display: flex; gap: 3px; background: var(--s2); border: 1px solid var(--bd); border-radius: 12px; padding: 3px; }
+    .seg button {
+      flex: 1 1 0; cursor: pointer; border: none; border-radius: 9px; background: transparent;
+      color: var(--ts); font: inherit; font-size: 12.5px; min-height: 40px; padding: 0 4px;
+      transition: background .16s ease, color .16s ease;
+    }
+    .seg button.on { background: var(--s1); color: var(--tp); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.28); }
+    .root.light .seg button.on { box-shadow: 0 1px 3px rgba(30,28,24,.12); }
+
+    input[type=range] { -webkit-appearance: none; appearance: none; height: 44px; background: transparent; width: 100%; }
+    input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--s3); }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--s1); margin-top: -10px; border: 2px solid var(--acc);
+      box-shadow: 0 2px 6px rgba(0,0,0,.35);
+    }
+
+    .bar { display: flex; height: 9px; border-radius: 5px; overflow: hidden; gap: 2px; background: var(--s3); }
+    .dot { width: 8px; height: 8px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }
+    .readout { font-family: var(--mono); font-size: 12.5px; color: var(--ts); }
+    .readout b { color: var(--tp); font-weight: 500; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; border-radius: 999px; padding: 3px 10px; background: var(--s3); color: var(--ts); }
+    .btn {
+      cursor: pointer; background: transparent; border: 1px solid var(--bd); border-radius: 11px;
+      color: var(--ts); font: inherit; font-size: 13.5px; padding: 13px 14px; width: 100%;
+    }
+  </style>
+</helmet>
+
+<div class="root {{themeClass}}">
+
+  <!-- pinned outcome -->
+  <div class="hero-bar">
+    <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:14px">
+      <div style="min-width:0">
+        <div class="eyebrow">Projected at age {{ageEnd}}</div>
+        <div class="hero" style="color:{{heroColor}}">{{terminalFmt}}</div>
+      </div>
+      <svg viewBox="0 0 120 40" width="120" height="40" style="flex:0 0 auto; overflow:visible">
+        <defs>
+          <linearGradient id="mfade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="{{heroColor}}" stop-opacity="0.30"></stop>
+            <stop offset="100%" stop-color="{{heroColor}}" stop-opacity="0"></stop>
+          </linearGradient>
+        </defs>
+        <path d="{{sparkArea}}" fill="url(#mfade)"></path>
+        <path d="{{sparkLine}}" fill="none" stroke="{{heroColor}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    </div>
+    <div class="fh" style="margin-top:2px">{{outcomeNote}}</div>
+  </div>
+
+  <div class="body">
+
+    <!-- ---------- INCOME ---------- -->
+    <sc-if value="{{isIncome}}" hint-placeholder-val="{{ true }}">
+    <div class="enter" style="display:flex; flex-direction:column; gap:14px">
+      <div class="card">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px">
+          <span class="eyebrow">Plan timeline</span>
+          <span class="readout"><b>{{earnYears}}</b>y earning</span>
+        </div>
+        <div class="bar" style="margin-bottom:9px">
+          <span style="width:{{earnPct}}; background:var(--c1)"></span>
+          <span style="width:{{drawPct}}; background:var(--c4)"></span>
+        </div>
+        <div style="display:flex; justify-content:space-between" class="m">
+          <span style="font-size:11px; color:var(--tm)">{{ageNow}}</span>
+          <span style="font-size:11px; color:var(--acc)">retire {{ageRetire}}</span>
+          <span style="font-size:11px; color:var(--tm)">{{ageEnd}}</span>
+        </div>
+      </div>
+
+      <div class="card" style="display:flex; flex-direction:column; gap:15px">
+        <span class="eyebrow">Earnings</span>
+        <div>
+          <div class="fl">Trajectory</div>
+          <div class="seg" style="margin-top:8px">
+            <sc-for list="{{trajOpts}}" as="o" hint-placeholder-count="4">
+              <button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button>
+            </sc-for>
+          </div>
+          <div class="fh">{{trajHint}}</div>
+        </div>
+        <div>
+          <div class="fl">Base salary</div>
+          <div class="ctl pre" style="margin-top:8px">
+            <span class="adorn">$</span>
+            <input type="number" step="5000" value="{{salary}}" onChange="{{onSalary}}">
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="display:flex; flex-direction:column; gap:15px">
+        <span class="eyebrow">Ages</span>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+          <div>
+            <div class="fl">Current</div>
+            <div class="ctl" style="margin-top:8px"><input type="number" value="{{ageNow}}" onChange="{{onAgeNow}}"></div>
+          </div>
+          <div>
+            <div class="fl">Retire at</div>
+            <div class="ctl" style="margin-top:8px"><input type="number" value="{{ageRetire}}" onChange="{{onAgeRetire}}"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline">
+            <span class="fl">Plan through age</span>
+            <span class="m" style="font-size:13.5px">{{ageEnd}}</span>
+          </div>
+          <input type="range" min="70" max="105" step="1" value="{{ageEnd}}" onChange="{{onAgeEnd}}">
+        </div>
+      </div>
+
+      <div class="card flat">
+        <div class="eyebrow" style="margin-bottom:9px">This year</div>
+        <div class="readout" style="line-height:2">
+          Gross <b>{{grossExact}}</b><br>
+          Estimated tax <b>{{taxFmt}}</b><br>
+          Take-home <b>{{netFmt}}</b>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ---------- ASSETS ---------- -->
+    <sc-if value="{{isAssets}}" hint-placeholder-val="{{ false }}">
+    <div class="enter" style="display:flex; flex-direction:column; gap:14px">
+      <div class="card" style="display:flex; flex-direction:column; gap:15px">
+        <span class="eyebrow">Balances</span>
+        <div>
+          <div class="fl">Invested balance</div>
+          <div class="ctl pre" style="margin-top:8px">
+            <span class="adorn">$</span>
+            <input type="number" step="10000" value="{{balance}}" onChange="{{onBalance}}">
+          </div>
+        </div>
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline">
+            <span class="fl">Taxable share</span>
+            <span class="m" style="font-size:13.5px">{{taxablePct}}%</span>
+          </div>
+          <input type="range" min="0" max="100" step="5" value="{{taxablePct}}" onChange="{{onTaxable}}">
+          <div class="bar">
+            <span style="width:{{taxableW}}; background:var(--c1)"></span>
+            <span style="width:{{advW}}; background:var(--c7)"></span>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:9px" class="readout">
+            <span><i class="dot" style="background:var(--c1)"></i> {{taxableAmt}}</span>
+            <span><i class="dot" style="background:var(--c7)"></i> {{advAmt}}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="display:flex; flex-direction:column; gap:15px">
+        <span class="eyebrow">Saving</span>
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline">
+            <span class="fl">Target savings rate</span>
+            <span class="m" style="font-size:13.5px">{{savePct}}%</span>
+          </div>
+          <input type="range" min="0" max="60" step="1" value="{{savePct}}" onChange="{{onSave}}">
+        </div>
+        <div class="card flat" style="box-shadow:none">
+          <div class="eyebrow" style="margin-bottom:10px">Where {{saveAmt}} a year goes</div>
+          <div class="bar" style="margin-bottom:11px">
+            <span style="width:{{advSaveW}}; background:var(--c7)"></span>
+            <span style="width:{{taxSaveW}}; background:var(--c1)"></span>
+          </div>
+          <div class="readout" style="line-height:2">
+            <i class="dot" style="background:var(--c7)"></i> 401k/IRA <b>{{advSaveAmt}}</b> {{capNote}}<br>
+            <i class="dot" style="background:var(--c1)"></i> Taxable <b>{{taxSaveAmt}}</b>
+          </div>
+        </div>
+        <div>
+          <div class="fl">Account type</div>
+          <div class="seg" style="margin-top:8px">
+            <sc-for list="{{acctOpts}}" as="o" hint-placeholder-count="2">
+              <button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button>
+            </sc-for>
+          </div>
+          <div class="fh">{{acctHint}}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:12px">
+          <span class="eyebrow">Allocation</span>
+          <span class="pill">{{expRet}} expected</span>
+        </div>
+        <div class="bar" style="height:12px; margin-bottom:8px">
+          <sc-for list="{{alloc}}" as="a" hint-placeholder-count="5">
+            <span style="width:{{a.w}}; background:{{a.color}}"></span>
+          </sc-for>
+        </div>
+        <sc-for list="{{alloc}}" as="a" hint-placeholder-count="5">
+          <div>
+            <div style="display:flex; align-items:center; gap:9px">
+              <i class="dot" style="background:{{a.color}}"></i>
+              <span class="fl" style="flex:1 1 auto; font-weight:400">{{a.label}}</span>
+              <span class="m" style="font-size:12.5px">{{a.pct}}%</span>
+            </div>
+            <input type="range" min="0" max="100" step="1" value="{{a.pct}}" onChange="{{a.set}}">
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <!-- ---------- LIABILITIES ---------- -->
+    <sc-if value="{{isLiab}}" hint-placeholder-val="{{ false }}">
+    <div class="enter" style="display:flex; flex-direction:column; gap:14px">
+      <div class="card">
+        <div class="eyebrow">Annual spending plan</div>
+        <div class="m" style="font-size:25px; font-weight:600; margin:6px 0 12px; letter-spacing:-0.03em">{{spendTotal}}</div>
+        <div class="bar" style="margin-bottom:10px">
+          <span style="width:{{essW}}; background:var(--c1)"></span>
+          <span style="width:{{discW}}; background:var(--c4)"></span>
+        </div>
+        <div class="readout" style="font-size:11.5px; line-height:1.9">
+          <i class="dot" style="background:var(--c1)"></i> Essential {{essAmt}} &nbsp;
+          <i class="dot" style="background:var(--c4)"></i> Discretionary {{discAmt}}
+        </div>
+      </div>
+
+      <!-- the six-column table becomes one card per line -->
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="7">
+        <div class="card" style="padding:13px">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+            <i class="dot" style="background:{{c.color}}"></i>
+            <span style="flex:1 1 auto; font-size:13.5px; font-weight:500">{{c.label}}</span>
+            <span class="m" style="font-size:11px; color:var(--tm)">{{c.share}}</span>
+          </div>
+          <div class="ctl pre" style="margin-bottom:11px">
+            <span class="adorn">$</span>
+            <input type="number" step="500" value="{{c.amount}}" onChange="{{c.setAmount}}">
+          </div>
+          <div style="display:flex; gap:10px">
+            <div style="flex:1 1 auto; min-width:0">
+              <div class="fh" style="margin:0 0 6px">Tracks cost of living</div>
+              <div class="seg">
+                <sc-for list="{{c.colOpts}}" as="o" hint-placeholder-count="3">
+                  <button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="flex:0 0 108px">
+              <div class="fh" style="margin:0 0 6px">Essential</div>
+              <div class="seg">
+                <sc-for list="{{c.essOpts}}" as="o" hint-placeholder-count="2">
+                  <button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+
+      <button class="btn">+ Add category</button>
+    </div>
+    </sc-if>
+
+    <!-- ---------- SCENARIO ---------- -->
+    <sc-if value="{{isScenario}}" hint-placeholder-val="{{ false }}">
+    <div class="enter" style="display:flex; flex-direction:column; gap:14px">
+      <div>
+        <div class="eyebrow" style="margin-bottom:10px">Market path</div>
+        <div style="display:flex; flex-direction:column; gap:9px">
+          <sc-for list="{{marketOpts}}" as="o" hint-placeholder-count="3">
+            <button onClick="{{o.pick}}" style="cursor:pointer; text-align:left; border:1px solid {{o.border}}; background:{{o.bg}}; border-radius:13px; padding:14px; display:flex; align-items:center; justify-content:space-between; gap:12px; transition:border-color .16s ease, background .16s ease">
+              <span style="min-width:0">
+                <span style="display:block; font-size:13.5px; font-weight:600; color:var(--tp)">{{o.label}}</span>
+                <span class="fh" style="display:block">{{o.note}}</span>
+              </span>
+              <span class="m" style="flex:0 0 auto; font-size:14px; color:{{o.tint}}">{{o.ret}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px">
+          <div>
+            <div class="fl">Market shock</div>
+            <div class="fh">A sharp drawdown in one year.</div>
+          </div>
+          <div class="seg" style="flex:0 0 132px">
+            <sc-for list="{{shockOpts}}" as="o" hint-placeholder-count="2">
+              <button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <sc-if value="{{shockOn}}" hint-placeholder-val="{{ true }}">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:13px; padding-top:13px; border-top:1px solid var(--bd)">
+            <div>
+              <div class="fl">Year</div>
+              <div class="ctl" style="margin-top:8px"><input type="number" value="{{shockYear}}" onChange="{{onShockYear}}"></div>
+            </div>
+            <div>
+              <div class="fl">Drawdown</div>
+              <div class="ctl suf" style="margin-top:8px">
+                <input type="number" value="{{shockMag}}" onChange="{{onShockMag}}">
+                <span class="adorn suf">%</span>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <div class="card">
+        <div class="eyebrow" style="margin-bottom:10px">Where you live</div>
+        <div class="seg">
+          <sc-for list="{{cityOpts}}" as="o" hint-placeholder-count="4">
+            <button class="{{o.cls}}" onClick="{{o.pick}}">{{o.label}}</button>
+          </sc-for>
+        </div>
+        <div class="fh">{{cityHint}}</div>
+      </div>
+    </div>
+    </sc-if>
+
+  </div>
+
+  <!-- bottom tab bar -->
+  <div class="tabbar">
+    <sc-for list="{{navs}}" as="n" hint-placeholder-count="4">
+      <button class="tabbtn {{n.cls}}" onClick="{{n.pick}}">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="{{n.path}}"></path>
+        </svg>
+        <span>{{n.name}}</span>
+      </button>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script data-props='{
+  "theme": {"editor":"enum","options":["dark","light"],"default":"dark","section":"Display"},
+  "$preview": {"width": 390, "height": 844}
+}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      tab: "income", trajectory: "promotion",
+      salary: 200000, ageNow: 32, ageRetire: 60, ageEnd: 95,
+      balance: 400000, cash: 40000, taxablePct: 60, savePct: 25,
+      advSharePct: 30, limit: 23500, acct: "traditional",
+      alloc: { us: 45, intl: 15, tsy: 20, corp: 15, cash: 5 },
+      infl: 2.5, cutPct: 20,
+      cats: [
+        { label: "Housing",                amount: 42000, col: 1,   ess: true  },
+        { label: "Food & groceries",       amount: 12000, col: 0.6, ess: true  },
+        { label: "Transportation",         amount: 6000,  col: 0.4, ess: true  },
+        { label: "Healthcare",             amount: 6000,  col: 0.3, ess: true  },
+        { label: "Insurance & fixed",      amount: 5000,  col: 0.2, ess: true  },
+        { label: "Travel & discretionary", amount: 15000, col: 0.3, ess: false },
+        { label: "Everything else",        amount: 4000,  col: 0.3, ess: false }
+      ],
+      market: "base", shockOn: false, shockYear: 2031, shockMag: -30, city: "nyc"
+    };
+  }
+
+  money(n) {
+    var a = Math.abs(Math.round(n)), sign = n < 0 ? "-" : "";
+    if (a >= 1000000) return sign + "$" + (a / 1000000).toFixed(2).replace(/\.?0+$/, "") + "M";
+    if (a >= 1000) return sign + "$" + Math.round(a / 1000) + "k";
+    return sign + "$" + a;
+  }
+  exact(n) { return "$" + Math.round(n).toLocaleString("en-US"); }
+  set(key) { var self = this; return function (e) { var o = {}; o[key] = Number(e.target.value); self.setState(o); }; }
+  pickVal(key, val) { var self = this; return function () { var o = {}; o[key] = val; self.setState(o); }; }
+  seg(key, opts) {
+    var cur = this.state[key], self = this;
+    return opts.map(function (o) { return { label: o.label, cls: o.id === cur ? "on" : "", pick: self.pickVal(key, o.id) }; });
+  }
+
+  expectedReturn() {
+    var a = this.state.alloc, total = a.us + a.intl + a.tsy + a.corp + a.cash;
+    if (total <= 0) return 0;
+    var M = { us: 7.5, intl: 7.0, tsy: 3.5, corp: 4.5, cash: 2.5 };
+    var d = { optimistic: 2, base: 0, pessimistic: -2.5 }[this.state.market];
+    return (a.us * (M.us + d) + a.intl * (M.intl + d) + a.tsy * M.tsy + a.corp * M.corp + a.cash * M.cash) / total;
+  }
+
+  project() {
+    var s = this.state;
+    var r = this.expectedReturn() / 100, infl = s.infl / 100;
+    var save = s.salary * s.savePct / 100;
+    var spend = s.cats.reduce(function (a, c) { return a + c.amount; }, 0);
+    var disc = s.cats.reduce(function (a, c) { return a + (c.ess ? 0 : c.amount); }, 0);
+    var bal = s.balance + s.cash;
+    var years = Math.max(1, s.ageEnd - s.ageNow);
+    var pts = [], depleted = null;
+    for (var y = 0; y <= years; y++) {
+      pts.push(bal);
+      var age = s.ageNow + y;
+      if (age < s.ageRetire) bal = bal * (1 + r) + save;
+      else bal = bal * (1 + r) - (spend - disc * s.cutPct / 100) * Math.pow(1 + infl, y);
+      if (bal < 0) { bal = 0; if (depleted === null) depleted = age; }
+    }
+    return { pts: pts, terminal: bal, depleted: depleted };
+  }
+
+  spark(pts, w, h) {
+    var max = Math.max.apply(null, pts) || 1, n = pts.length - 1 || 1, line = "";
+    for (var i = 0; i < pts.length; i++) {
+      line += (i === 0 ? "M" : "L") + ((i / n) * w).toFixed(1) + "," + (h - (pts[i] / max) * (h - 3) - 1.5).toFixed(1);
+    }
+    return { line: line, area: line + "L" + w + "," + h + "L0," + h + "Z" };
+  }
+
+  renderVals() {
+    var s = this.state, self = this;
+    var CAT = ["var(--c1)","var(--c2)","var(--c3)","var(--c4)","var(--c5)","var(--c6)","var(--c7)"];
+    var earn = Math.max(0, s.ageRetire - s.ageNow);
+    var draw = Math.max(0, s.ageEnd - s.ageRetire);
+    var span = Math.max(1, earn + draw);
+    var tax = s.salary * 0.347;
+    var spend = s.cats.reduce(function (a, c) { return a + c.amount; }, 0);
+    var ess = s.cats.reduce(function (a, c) { return a + (c.ess ? c.amount : 0); }, 0);
+    var save = s.salary * s.savePct / 100;
+    var wantAdv = save * s.advSharePct / 100;
+    var adv = Math.min(wantAdv, s.limit);
+    var a = s.alloc, allocTotal = a.us + a.intl + a.tsy + a.corp + a.cash;
+    var proj = this.project();
+    var sp = this.spark(proj.pts, 120, 40);
+    var healthy = proj.depleted === null;
+
+    var allocRows = [
+      { key: "us", label: "US equity", pct: a.us },
+      { key: "intl", label: "Intl equity", pct: a.intl },
+      { key: "tsy", label: "US Treasuries", pct: a.tsy },
+      { key: "corp", label: "Corporate bonds", pct: a.corp },
+      { key: "cash", label: "Cash", pct: a.cash }
+    ].map(function (r, i) {
+      return {
+        label: r.label, pct: r.pct, color: CAT[i],
+        w: (allocTotal > 0 ? r.pct / allocTotal * 100 : 0) + "%",
+        set: function (e) {
+          var next = Object.assign({}, self.state.alloc);
+          next[r.key] = Number(e.target.value);
+          self.setState({ alloc: next });
+        }
+      };
+    });
+
+    var cats = s.cats.map(function (c, i) {
+      var colId = c.col >= 0.8 ? "full" : (c.col <= 0.2 ? "none" : "some");
+      var put = function (patch) {
+        return function () {
+          var next = s.cats.slice();
+          next[i] = Object.assign({}, c, patch);
+          self.setState({ cats: next });
+        };
+      };
+      return {
+        label: c.label, amount: c.amount, color: CAT[i % CAT.length],
+        share: (spend > 0 ? Math.round(c.amount / spend * 100) : 0) + "%",
+        setAmount: function (e) {
+          var next = s.cats.slice();
+          next[i] = Object.assign({}, c, { amount: Number(e.target.value) });
+          self.setState({ cats: next });
+        },
+        colOpts: [{ l: "None", v: 0, id: "none" }, { l: "Some", v: 0.5, id: "some" }, { l: "Full", v: 1, id: "full" }]
+          .map(function (o) { return { label: o.l, cls: o.id === colId ? "on" : "", pick: put({ col: o.v }) }; }),
+        essOpts: [{ l: "Yes", v: true }, { l: "No", v: false }]
+          .map(function (o) { return { label: o.l, cls: o.v === c.ess ? "on" : "", pick: put({ ess: o.v }) }; })
+      };
+    });
+
+    var CITY = { seattle: "Seattle", nyc: "New York City", jerseycity: "Jersey City", la: "Los Angeles" };
+    var CITY_HINT = {
+      seattle: "No tax on wages, but a 7% state excise on large realized gains.",
+      nyc: "NY state plus the NYC resident tax; gains taxed as ordinary income.",
+      jerseycity: "NJ state only, no local tax.",
+      la: "CA state only, plus 1.2% SDI on all wages."
+    };
+    var NAV = [
+      { id: "income",   name: "Income",      path: "M3 17l6-6 4 4 8-8" },
+      { id: "assets",   name: "Assets",      path: "M4 7h16M4 12h16M4 17h10" },
+      { id: "liab",     name: "Spending",    path: "M3 10h18M6 10V6h12v4M5 10v10h14V10" },
+      { id: "scenario", name: "Scenario",    path: "M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2" }
+    ];
+
+    return {
+      themeClass: (this.props.theme || "dark") === "light" ? "light" : "",
+      navs: NAV.map(function (n) {
+        return { name: n.name, path: n.path, cls: s.tab === n.id ? "on" : "", pick: self.pickVal("tab", n.id) };
+      }),
+      isIncome: s.tab === "income", isAssets: s.tab === "assets",
+      isLiab: s.tab === "liab", isScenario: s.tab === "scenario",
+
+      terminalFmt: this.money(proj.terminal),
+      heroColor: healthy ? "var(--acc)" : "var(--crit)",
+      outcomeNote: healthy ? "Funded through the whole plan." : "Runs dry at age " + proj.depleted + ".",
+      sparkLine: sp.line, sparkArea: sp.area,
+
+      ageNow: s.ageNow, ageRetire: s.ageRetire, ageEnd: s.ageEnd,
+      earnYears: earn, drawYears: draw,
+      earnPct: (earn / span * 100) + "%", drawPct: (draw / span * 100) + "%",
+      salary: s.salary, onSalary: this.set("salary"),
+      onAgeNow: this.set("ageNow"), onAgeRetire: this.set("ageRetire"), onAgeEnd: this.set("ageEnd"),
+      grossExact: this.exact(s.salary), taxFmt: this.exact(tax), netFmt: this.exact(s.salary - tax),
+      trajOpts: this.seg("trajectory", [
+        { id: "promotion", label: "Promotion" }, { id: "flat", label: "Flat" },
+        { id: "schedule", label: "Schedule" }, { id: "exit", label: "Exit" }
+      ]),
+      trajHint: {
+        promotion: "A step-up every 3 years in real terms, up to a cap.",
+        flat: "Salary keeps pace with inflation and nothing more.",
+        schedule: "Type a figure per year; nominal, no inflation added.",
+        exit: "Income steps down at a year you choose."
+      }[s.trajectory],
+
+      balance: s.balance, onBalance: this.set("balance"),
+      taxablePct: s.taxablePct, onTaxable: this.set("taxablePct"),
+      taxableW: s.taxablePct + "%", advW: (100 - s.taxablePct) + "%",
+      taxableAmt: this.money(s.balance * s.taxablePct / 100),
+      advAmt: this.money(s.balance * (100 - s.taxablePct) / 100),
+      savePct: s.savePct, onSave: this.set("savePct"),
+      saveAmt: this.money(save),
+      advSaveAmt: this.exact(adv), taxSaveAmt: this.exact(save - adv),
+      advSaveW: (save > 0 ? adv / save * 100 : 0) + "%",
+      taxSaveW: (save > 0 ? (save - adv) / save * 100 : 0) + "%",
+      capNote: wantAdv > s.limit ? "(at the cap)" : "",
+      acctOpts: this.seg("acct", [
+        { id: "traditional", label: "Traditional" }, { id: "roth", label: "Roth" }
+      ]),
+      acctHint: s.acct === "traditional"
+        ? "Deducted from this year's taxable income, taxed on withdrawal."
+        : "Contributed after tax, withdrawn tax free.",
+      alloc: allocRows,
+      expRet: this.expectedReturn().toFixed(1) + "%",
+
+      spendTotal: this.exact(spend),
+      essAmt: this.money(ess), discAmt: this.money(spend - ess),
+      essW: (spend > 0 ? ess / spend * 100 : 0) + "%",
+      discW: (spend > 0 ? (spend - ess) / spend * 100 : 0) + "%",
+      cats: cats,
+
+      marketOpts: [
+        { id: "optimistic", label: "Optimistic", ret: "+2.0", note: "Equities above long-run means." },
+        { id: "base", label: "Base", ret: "long-run", note: "Historical means, no adjustment." },
+        { id: "pessimistic", label: "Pessimistic", ret: "-2.5", note: "A sustained low-return decade." }
+      ].map(function (o) {
+        var on = o.id === s.market;
+        return { label: o.label, ret: o.ret, note: o.note, pick: self.pickVal("market", o.id),
+                 border: on ? "var(--acc)" : "var(--bd)",
+                 bg: on ? "var(--acc-soft)" : "var(--s1)",
+                 tint: on ? "var(--acc)" : "var(--ts)" };
+      }),
+      shockOn: s.shockOn,
+      shockOpts: [{ v: false, l: "Off" }, { v: true, l: "On" }].map(function (o) {
+        return { label: o.l, cls: o.v === s.shockOn ? "on" : "", pick: self.pickVal("shockOn", o.v) };
+      }),
+      shockYear: s.shockYear, onShockYear: this.set("shockYear"),
+      shockMag: s.shockMag, onShockMag: this.set("shockMag"),
+      cityOpts: [
+        { id: "seattle", label: "Seattle" }, { id: "nyc", label: "NYC" },
+        { id: "jerseycity", label: "JC" }, { id: "la", label: "LA" }
+      ].map(function (o) {
+        return { label: o.label, cls: o.id === s.city ? "on" : "", pick: self.pickVal("city", o.id) };
+      }),
+      cityHint: CITY_HINT[s.city]
+    };
+  }
+}
+</script>
+</body>
+</html>

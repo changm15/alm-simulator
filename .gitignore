@@ -1,0 +1,8 @@
+node_modules
+dist
+.DS_Store
+*.log
+
+# Seeded design-canvas output: a ~2 MB generated bundle. The .dc.html sources
+# and canvas.json beside it are the editable originals.
+design/alm-config-tabs.html
