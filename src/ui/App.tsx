@@ -70,7 +70,7 @@ const DEFAULTS: SharedState = {
   income: {
     baseSalary: 100_000,
     startYear: THIS_YEAR,
-    currentAge: 30,
+    currentAge: 28,
     retirementAge: 65,
     trajectory: "promotion_track",
     promotionCapMultiple: 2,
