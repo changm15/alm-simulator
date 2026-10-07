@@ -33,6 +33,7 @@ export function Ledger({ path }: { path: PathResult }) {
               <th className={sec}>Where</th>
               <th>Income</th>
               <th>Total tax</th>
+              <th>After tax</th>
               <th>Expenses</th>
               <th className={sec}>Income tax</th>
               <th className={sec}>Payroll</th>
@@ -68,6 +69,7 @@ export function Ledger({ path }: { path: PathResult }) {
                 </td>
                 <td>{currencyExact(y.totalIncome)}</td>
                 <td>{currencyExact(y.totalTax)}</td>
+                <td>{currencyExact(y.totalIncome - y.totalTax)}</td>
                 <td>{currencyExact(y.expenses)}</td>
                 <td className={sec}>{currencyExact(y.incomeTax)}</td>
                 <td className={sec}>{currencyExact(y.payrollTax)}</td>

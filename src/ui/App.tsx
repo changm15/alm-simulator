@@ -355,6 +355,7 @@ export function App() {
               income={income}
               planToAge={planToAge}
               horizonYears={horizonYears}
+              live={live}
               onIncome={(p) => setIncome({ ...income, ...p })}
               onPlanToAge={setPlanToAge}
             />

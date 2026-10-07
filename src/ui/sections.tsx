@@ -1,6 +1,7 @@
 import {
   ASSET_CLASSES,
   AssetConfig,
+  PathResult,
   ExpenseCategory,
   IncomeConfig,
   Jurisdiction,
@@ -33,6 +34,7 @@ import {
   TextInput,
 } from "./controls";
 import { ASSET_LABELS, CAT_COLORS, JURISDICTION_LABELS, JURISDICTION_SHORT } from "./labels";
+import { Chart } from "./charts";
 import { currency, currencyExact, pct } from "./format";
 
 const TRAJECTORY_HINTS: Record<IncomeConfig["trajectory"], string> = {
@@ -74,12 +76,15 @@ export function IncomeSection({
   income,
   planToAge,
   horizonYears,
+  live,
   onIncome,
   onPlanToAge,
 }: {
   income: IncomeConfig;
   planToAge: number;
   horizonYears: number;
+  /** The live deterministic run, for the before/after-tax readouts. */
+  live: PathResult;
   onIncome: (patch: Partial<IncomeConfig>) => void;
   onPlanToAge: (v: number) => void;
 }) {
@@ -264,6 +269,167 @@ export function IncomeSection({
           />
         </Card>
       </div>
+
+      <TakeHome live={live} />
+    </div>
+  );
+}
+
+/**
+ * Before and after tax, this year and across the plan.
+ *
+ * Both come straight from the engine rather than an effective-rate guess, so
+ * the wedge shown here is the same one the projection is actually running on.
+ */
+function TakeHome({ live }: { live: PathResult }) {
+  const y0 = live.years[0];
+  if (!y0) return null;
+
+  const afterTax = y0.totalIncome - y0.totalTax;
+  const rate = y0.totalIncome > 0 ? (y0.totalTax / y0.totalIncome) * 100 : 0;
+  const rows: { label: string; amount: number; color?: string }[] = [
+    { label: "Wages", amount: y0.grossWageIncome },
+    { label: "Other income", amount: y0.otherIncome },
+    { label: "Government benefit", amount: y0.benefitNet },
+  ].filter((r) => r.amount > 0);
+
+  const taxRows = [
+    { label: "Income tax", amount: y0.incomeTax, color: "var(--cat-2)" },
+    { label: "Payroll tax", amount: y0.payrollTax, color: "var(--cat-4)" },
+    { label: "Capital gains tax", amount: y0.capitalGainsTax, color: "var(--cat-5)" },
+  ].filter((r) => r.amount > 0);
+
+  // After-tax can fall below zero once wage income stops: the tax bill is then
+  // driven by portfolio withdrawals, which are not "income" in this sense.
+  const anyNegative = live.years.some((y) => y.totalIncome - y.totalTax < 0);
+
+  return (
+    <div className="cols" style={{ marginTop: 16 }}>
+      <Card title={`Before and after tax — ${y0.year}`}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 12 }}>
+          <div>
+            <div className="eyebrow">Gross</div>
+            <div className="m" style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em" }}>
+              {currencyExact(y0.totalIncome)}
+            </div>
+          </div>
+          <div style={{ color: "var(--tm)", fontSize: 18 }}>&rarr;</div>
+          <div>
+            <div className="eyebrow">Take-home</div>
+            <div
+              className="m"
+              style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--acc)" }}
+            >
+              {currencyExact(afterTax)}
+            </div>
+          </div>
+          <span className="pill" style={{ marginLeft: "auto" }}>
+            {pct(rate)} to tax
+          </span>
+        </div>
+
+        <StackBar
+          segments={[
+            {
+              key: "net",
+              fraction: y0.totalIncome > 0 ? afterTax / y0.totalIncome : 0,
+              color: "var(--acc)",
+            },
+            ...taxRows.map((t) => ({
+              key: t.label,
+              fraction: y0.totalIncome > 0 ? t.amount / y0.totalIncome : 0,
+              color: t.color,
+            })),
+          ]}
+          height={12}
+        />
+
+        <div className="readout" style={{ lineHeight: 2, marginTop: 12 }}>
+          {rows.map((r) => (
+            <div key={r.label} style={{ display: "flex", justifyContent: "space-between" }}>
+              <span>{r.label}</span>
+              <b>{currencyExact(r.amount)}</b>
+            </div>
+          ))}
+          {taxRows.map((t) => (
+            <div
+              key={t.label}
+              style={{ display: "flex", justifyContent: "space-between", color: "var(--tm)" }}
+            >
+              <span>
+                <Dot color={t.color} /> {t.label}
+              </span>
+              <b style={{ color: "var(--ts)" }}>−{currencyExact(t.amount)}</b>
+            </div>
+          ))}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              borderTop: "1px solid var(--bd)",
+              marginTop: 6,
+              paddingTop: 6,
+            }}
+          >
+            <span>
+              <Dot color="var(--acc)" /> After tax
+            </span>
+            <b>{currencyExact(afterTax)}</b>
+          </div>
+        </div>
+        {y0.taxAdvantagedContribution > 0 && (
+          <p className="fh">
+            Income tax is charged on{" "}
+            {currencyExact(y0.ordinaryTaxableIncome)}, not the full gross,
+            because {currencyExact(y0.taxAdvantagedContribution)} was deferred
+            to the 401k/IRA. Payroll tax still applies to every dollar of wages.
+            That deferral is inside the take-home figure — it is income you
+            keep, just not in your current account.
+          </p>
+        )}
+      </Card>
+
+      <Card title="Across the plan">
+        <div className="legend">
+          <span>
+            <span className="swatch" style={{ background: "var(--cat-3)" }} />
+            Gross income
+          </span>
+          <span>
+            <span className="swatch" style={{ background: "var(--acc)" }} />
+            After tax
+          </span>
+        </div>
+        <Chart
+          series={[
+            {
+              label: "Gross income",
+              color: "var(--cat-3)",
+              points: live.years.map((y) => ({ x: y.year, y: y.totalIncome })),
+            },
+            {
+              label: "After tax",
+              color: "var(--acc)",
+              fill: "var(--acc-fill)",
+              points: live.years.map((y) => ({
+                x: y.year,
+                y: y.totalIncome - y.totalTax,
+              })),
+            },
+          ]}
+          aspect={2.3}
+          minHeight={200}
+          maxHeight={260}
+          xLabel="Year"
+          yLabel="Income"
+        />
+        <p className="fh">
+          The gap between the lines is the tax wedge, in nominal dollars.
+          {anyNegative
+            ? " After wage income stops it can drop below zero: the bill is then driven by portfolio withdrawals, which the portfolio itself has to fund."
+            : ""}
+        </p>
+      </Card>
     </div>
   );
 }
